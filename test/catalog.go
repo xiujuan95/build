@@ -270,12 +270,13 @@ func (c *Catalog) SecretList(name string) corev1.SecretList {
 // StubFunc is used to simulate the status of the Build
 // after a .Status().Update() call in the controller. This
 // receives a parameter to return an specific status state
-func (c *Catalog) StubFunc(status corev1.ConditionStatus, reason string) func(context context.Context, object runtime.Object, _ ...crc.UpdateOption) error {
+func (c *Catalog) StubFunc(status corev1.ConditionStatus, reason build.BuildReason, message string) func(context context.Context, object runtime.Object, _ ...crc.UpdateOption) error {
 	return func(context context.Context, object runtime.Object, _ ...crc.UpdateOption) error {
 		switch object := object.(type) {
 		case *build.Build:
 			Expect(object.Status.Registered).To(Equal(status))
-			Expect(object.Status.Reason).To(ContainSubstring(reason))
+			Expect(object.Status.Reason).To(Equal(reason))
+			Expect(object.Status.Message).To(Equal(message))
 		}
 		return nil
 	}
@@ -351,10 +352,13 @@ func (c *Catalog) StubBuildAndTaskRun(
 }
 
 // StubBuildStatusReason asserts Status fields on a Build resource
-func (c *Catalog) StubBuildStatusReason(reason string) func(context context.Context, object runtime.Object, _ ...crc.UpdateOption) error {
+func (c *Catalog) StubBuildStatusReason(reason build.BuildReason, message string) func(context context.Context, object runtime.Object, _ ...crc.UpdateOption) error {
 	return func(context context.Context, object runtime.Object, _ ...crc.UpdateOption) error {
 		switch object := object.(type) {
 		case *build.Build:
+			if object.Status.Message != "" {
+				Expect(object.Status.Message).To(Equal(message))
+			}
 			if object.Status.Reason != "" {
 				Expect(object.Status.Reason).To(Equal(reason))
 			}

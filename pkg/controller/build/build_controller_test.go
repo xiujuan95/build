@@ -7,7 +7,6 @@ package build_test
 import (
 	"context"
 	"fmt"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -34,6 +33,7 @@ var _ = Describe("Reconcile Build", func() {
 		reconciler                   reconcile.Reconciler
 		request                      reconcile.Request
 		buildSample                  *build.Build
+		secretSample                 *corev1.Secret
 		client                       *fakes.FakeClient
 		ctl                          test.Catalog
 		statusWriter                 *fakes.FakeStatusWriter
@@ -89,9 +89,6 @@ var _ = Describe("Reconcile Build", func() {
 				// different resources we could get during reconciliation
 				client.ListCalls(func(context context.Context, object runtime.Object, _ ...crc.ListOption) error {
 					switch object := object.(type) {
-					case *corev1.SecretList:
-						list := ctl.FakeSecretList()
-						list.DeepCopyInto(object)
 					case *build.ClusterBuildStrategyList:
 						list := ctl.ClusterBuildStrategyList(buildStrategyName)
 						list.DeepCopyInto(object)
@@ -99,7 +96,7 @@ var _ = Describe("Reconcile Build", func() {
 					return nil
 				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionFalse, "secret non-existing does not exist")
+				statusCall := ctl.StubFunc(corev1.ConditionFalse, build.SpecSourceSecretRefNotFound, "referenced secret non-existing not found")
 				statusWriter.UpdateCalls(statusCall)
 
 				_, err := reconciler.Reconcile(request)
@@ -107,19 +104,29 @@ var _ = Describe("Reconcile Build", func() {
 				Expect(statusWriter.UpdateCallCount()).To(Equal(1))
 			})
 
-			It("succeeds when the secret exists", func() {
+			It("succeeds when the secret exists foobar", func() {
 				buildSample.Spec.Source.SecretRef = &corev1.LocalObjectReference{
 					Name: "existing",
 				}
 				buildSample.Spec.Output.SecretRef = nil
 
+				// Fake some client Get calls and ensure we populate all
+				// different resources we could get during reconciliation
+				client.GetCalls(func(context context.Context, nn types.NamespacedName, object runtime.Object) error {
+					switch object := object.(type) {
+					case *build.Build:
+						buildSample.DeepCopyInto(object)
+					case *corev1.Secret:
+						secretSample = ctl.SecretWithoutAnnotation("existing", namespace)
+						secretSample.DeepCopyInto(object)
+					}
+					return nil
+				})
+
 				// Fake some client LIST calls and ensure we populate all
 				// different resources we could get during reconciliation
 				client.ListCalls(func(context context.Context, object runtime.Object, _ ...crc.ListOption) error {
 					switch object := object.(type) {
-					case *corev1.SecretList:
-						list := ctl.SecretList("existing")
-						list.DeepCopyInto(object)
 					case *build.ClusterBuildStrategyList:
 						list := ctl.ClusterBuildStrategyList(buildStrategyName)
 						list.DeepCopyInto(object)
@@ -127,7 +134,7 @@ var _ = Describe("Reconcile Build", func() {
 					return nil
 				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionTrue, "Succeeded")
+				statusCall := ctl.StubFunc(corev1.ConditionTrue, build.SucceedStatus, "all validations succeeded")
 				statusWriter.UpdateCalls(statusCall)
 
 				result, err := reconciler.Reconcile(request)
@@ -151,9 +158,6 @@ var _ = Describe("Reconcile Build", func() {
 				// different resources we could get during reconciliation
 				client.ListCalls(func(context context.Context, object runtime.Object, _ ...crc.ListOption) error {
 					switch object := object.(type) {
-					case *corev1.SecretList:
-						list := ctl.FakeSecretList()
-						list.DeepCopyInto(object)
 					case *build.ClusterBuildStrategyList:
 						list := ctl.ClusterBuildStrategyList(buildStrategyName)
 						list.DeepCopyInto(object)
@@ -161,7 +165,7 @@ var _ = Describe("Reconcile Build", func() {
 					return nil
 				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionFalse, "secret non-existing does not exist")
+				statusCall := ctl.StubFunc(corev1.ConditionFalse, build.SpecRuntimeSecretRefNotFound, "referenced secret non-existing not found")
 				statusWriter.UpdateCalls(statusCall)
 
 				_, err := reconciler.Reconcile(request)
@@ -178,13 +182,24 @@ var _ = Describe("Reconcile Build", func() {
 				}
 				buildSample.Spec.Output.SecretRef = nil
 
+				// Fake some client Get calls and ensure we populate all
+				// different resources we could get during reconciliation
+				client.GetCalls(func(context context.Context, nn types.NamespacedName, object runtime.Object) error {
+					switch object := object.(type) {
+					case *corev1.Secret:
+						secretSample = ctl.SecretWithoutAnnotation("existing", namespace)
+						secretSample.DeepCopyInto(object)
+					case *build.Build:
+						buildSample.DeepCopyInto(object)
+					}
+
+					return nil
+				})
+
 				// Fake some client LIST calls and ensure we populate all
 				// different resources we could get during reconciliation
 				client.ListCalls(func(context context.Context, object runtime.Object, _ ...crc.ListOption) error {
 					switch object := object.(type) {
-					case *corev1.SecretList:
-						list := ctl.SecretList("existing")
-						list.DeepCopyInto(object)
 					case *build.ClusterBuildStrategyList:
 						list := ctl.ClusterBuildStrategyList(buildStrategyName)
 						list.DeepCopyInto(object)
@@ -192,7 +207,7 @@ var _ = Describe("Reconcile Build", func() {
 					return nil
 				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionTrue, "Succeeded")
+				statusCall := ctl.StubFunc(corev1.ConditionTrue, build.SucceedStatus, "all validations succeeded")
 				statusWriter.UpdateCalls(statusCall)
 
 				result, err := reconciler.Reconcile(request)
@@ -209,9 +224,6 @@ var _ = Describe("Reconcile Build", func() {
 				// different resources we could get during reconciliation
 				client.ListCalls(func(context context.Context, object runtime.Object, _ ...crc.ListOption) error {
 					switch object := object.(type) {
-					case *corev1.SecretList:
-						list := ctl.FakeSecretList()
-						list.DeepCopyInto(object)
 					case *build.ClusterBuildStrategyList:
 						list := ctl.ClusterBuildStrategyList(buildStrategyName)
 						list.DeepCopyInto(object)
@@ -219,7 +231,7 @@ var _ = Describe("Reconcile Build", func() {
 					return nil
 				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionFalse, fmt.Sprintf("secret %s does not exist", registrySecret))
+				statusCall := ctl.StubFunc(corev1.ConditionFalse, build.SpecOutputSecretRefNotFound, fmt.Sprintf("referenced secret %s not found", registrySecret))
 				statusWriter.UpdateCalls(statusCall)
 
 				_, err := reconciler.Reconcile(request)
@@ -227,6 +239,19 @@ var _ = Describe("Reconcile Build", func() {
 				Expect(statusWriter.UpdateCallCount()).To(Equal(1))
 			})
 			It("succeed when the secret exists", func() {
+				// Fake some client Get calls and ensure we populate all
+				// different resources we could get during reconciliation
+				client.GetCalls(func(context context.Context, nn types.NamespacedName, object runtime.Object) error {
+					switch object := object.(type) {
+					case *corev1.Secret:
+						secretSample = ctl.SecretWithoutAnnotation("existing", namespace)
+						secretSample.DeepCopyInto(object)
+					case *build.Build:
+						buildSample.DeepCopyInto(object)
+					}
+
+					return nil
+				})
 
 				// Fake some client LIST calls and ensure we populate all
 				// different resources we could get during reconciliation
@@ -241,34 +266,13 @@ var _ = Describe("Reconcile Build", func() {
 					}
 					return nil
 				})
-				statusCall := ctl.StubFunc(corev1.ConditionTrue, "Succeeded")
+				statusCall := ctl.StubFunc(corev1.ConditionTrue, build.SucceedStatus, "all validations succeeded")
 				statusWriter.UpdateCalls(statusCall)
 
 				result, err := reconciler.Reconcile(request)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(statusWriter.UpdateCallCount()).To(Equal(1))
 				Expect(reconcile.Result{}).To(Equal(result))
-			})
-			It("fails when no any secret exists in namespace", func() {
-				// Fake some client LIST calls and ensure we populate all
-				// different resources we could get during reconciliation
-				client.ListCalls(func(context context.Context, object runtime.Object, _ ...crc.ListOption) error {
-					switch object := object.(type) {
-					case *corev1.SecretList:
-						list := ctl.FakeNoSecretListInNamespace()
-						list.DeepCopyInto(object)
-					case *build.ClusterBuildStrategyList:
-						list := ctl.ClusterBuildStrategyList(buildStrategyName)
-						list.DeepCopyInto(object)
-					}
-					return nil
-				})
-				statusCall := ctl.StubFunc(corev1.ConditionFalse, fmt.Sprintf("there are no secrets in namespace %s", namespace))
-				statusWriter.UpdateCalls(statusCall)
-
-				_, err := reconciler.Reconcile(request)
-				Expect(err).To(BeNil())
-				Expect(statusWriter.UpdateCallCount()).To(Equal(1))
 			})
 		})
 
@@ -285,15 +289,15 @@ var _ = Describe("Reconcile Build", func() {
 				// different resources we could get during reconciliation
 				client.ListCalls(func(context context.Context, object runtime.Object, _ ...crc.ListOption) error {
 					switch object := object.(type) {
-					case *corev1.SecretList:
-						list := ctl.FakeSecretList()
-						list.DeepCopyInto(object)
 					case *build.ClusterBuildStrategyList:
 						list := ctl.ClusterBuildStrategyList(buildStrategyName)
 						list.DeepCopyInto(object)
 					}
 					return nil
 				})
+
+				statusCall := ctl.StubFunc(corev1.ConditionFalse, build.MultipleSecretRefNotFound, "missing secrets are non-existing-output,non-existing-source")
+				statusWriter.UpdateCalls(statusCall)
 
 				_, err := reconciler.Reconcile(request)
 				Expect(err).To(BeNil())
@@ -308,23 +312,31 @@ var _ = Describe("Reconcile Build", func() {
 				// different resources we could get during reconciliation
 				client.ListCalls(func(context context.Context, object runtime.Object, _ ...crc.ListOption) error {
 					switch object := object.(type) {
-					case *corev1.SecretList:
-						list := ctl.SecretList(registrySecret)
-						list.DeepCopyInto(object)
 					case *build.ClusterBuildStrategyList:
 						list := ctl.FakeClusterBuildStrategyList()
 						list.DeepCopyInto(object)
 					}
 					return nil
 				})
+				// Fake some client Get calls and ensure we populate all
+				// different resources we could get during reconciliation
+				client.GetCalls(func(context context.Context, nn types.NamespacedName, object runtime.Object) error {
+					switch object := object.(type) {
+					case *build.Build:
+						buildSample.DeepCopyInto(object)
+					case *corev1.Secret:
+						secretSample = ctl.SecretWithoutAnnotation("existing", namespace)
+						secretSample.DeepCopyInto(object)
+					}
+					return nil
+				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionFalse, fmt.Sprintf("clusterBuildStrategy %s does not exist", buildStrategyName))
+				statusCall := ctl.StubFunc(corev1.ConditionFalse, build.ClusterBuildStrategyNotFound, fmt.Sprintf("clusterBuildStrategy %s does not exist", buildStrategyName))
 				statusWriter.UpdateCalls(statusCall)
 
 				_, err := reconciler.Reconcile(request)
-				Expect(err).To(HaveOccurred())
+				Expect(err).To(BeNil())
 				Expect(statusWriter.UpdateCallCount()).To(Equal(1))
-				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("clusterBuildStrategy %s does not exist", buildStrategyName)))
 			})
 			It("succeed when the strategy exists", func() {
 
@@ -332,9 +344,6 @@ var _ = Describe("Reconcile Build", func() {
 				// different resources we could get during reconciliation
 				client.ListCalls(func(context context.Context, object runtime.Object, _ ...crc.ListOption) error {
 					switch object := object.(type) {
-					case *corev1.SecretList:
-						list := ctl.SecretList(registrySecret)
-						list.DeepCopyInto(object)
 					case *build.ClusterBuildStrategyList:
 						list := ctl.ClusterBuildStrategyList(buildStrategyName)
 						list.DeepCopyInto(object)
@@ -342,7 +351,20 @@ var _ = Describe("Reconcile Build", func() {
 					return nil
 				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionTrue, "Succeeded")
+				// Fake some client Get calls and ensure we populate all
+				// different resources we could get during reconciliation
+				client.GetCalls(func(context context.Context, nn types.NamespacedName, object runtime.Object) error {
+					switch object := object.(type) {
+					case *build.Build:
+						buildSample.DeepCopyInto(object)
+					case *corev1.Secret:
+						secretSample = ctl.SecretWithoutAnnotation("existing", namespace)
+						secretSample.DeepCopyInto(object)
+					}
+					return nil
+				})
+
+				statusCall := ctl.StubFunc(corev1.ConditionTrue, build.SucceedStatus, "all validations succeeded")
 				statusWriter.UpdateCalls(statusCall)
 
 				result, err := reconciler.Reconcile(request)
@@ -350,31 +372,8 @@ var _ = Describe("Reconcile Build", func() {
 				Expect(statusWriter.UpdateCallCount()).To(Equal(1))
 				Expect(reconcile.Result{}).To(Equal(result))
 			})
-			It("fails when no any clusterStrategy exists", func() {
-
-				// Fake some client LIST calls and ensure we populate all
-				// different resources we could get during reconciliation
-				client.ListCalls(func(context context.Context, object runtime.Object, _ ...crc.ListOption) error {
-					switch object := object.(type) {
-					case *corev1.SecretList:
-						list := ctl.SecretList(registrySecret)
-						list.DeepCopyInto(object)
-					case *build.ClusterBuildStrategyList:
-						list := ctl.FakeNoClusterBuildStrategyList()
-						list.DeepCopyInto(object)
-					}
-					return nil
-				})
-
-				statusCall := ctl.StubFunc(corev1.ConditionFalse, "no ClusterBuildStrategies found")
-				statusWriter.UpdateCalls(statusCall)
-
-				_, err := reconciler.Reconcile(request)
-				Expect(err).To(HaveOccurred())
-				Expect(statusWriter.UpdateCallCount()).To(Equal(1))
-				Expect(err.Error()).To(ContainSubstring("no ClusterBuildStrategies found"))
-			})
 		})
+
 		Context("when spec strategy BuildStrategy is specified", func() {
 			JustBeforeEach(func() {
 				buildStrategyName = "buildpacks-v3"
@@ -399,13 +398,12 @@ var _ = Describe("Reconcile Build", func() {
 					return nil
 				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionFalse, fmt.Sprintf("buildStrategy %s does not exist in namespace %s", buildStrategyName, namespace))
+				statusCall := ctl.StubFunc(corev1.ConditionFalse, build.BuildStrategyNotFound, fmt.Sprintf("buildStrategy %s does not exist in namespace %s", buildStrategyName, namespace))
 				statusWriter.UpdateCalls(statusCall)
 
 				_, err := reconciler.Reconcile(request)
-				Expect(err).To(HaveOccurred())
+				Expect(err).To(BeNil())
 				Expect(statusWriter.UpdateCallCount()).To(Equal(1))
-				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("buildStrategy %s does not exist in namespace %s", buildStrategyName, namespace)))
 			})
 			It("succeed when the strategy exists", func() {
 
@@ -423,7 +421,7 @@ var _ = Describe("Reconcile Build", func() {
 					return nil
 				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionTrue, "Succeeded")
+				statusCall := ctl.StubFunc(corev1.ConditionTrue, build.SucceedStatus, "all validations succeeded")
 				statusWriter.UpdateCalls(statusCall)
 
 				result, err := reconciler.Reconcile(request)
@@ -431,31 +429,8 @@ var _ = Describe("Reconcile Build", func() {
 				Expect(statusWriter.UpdateCallCount()).To(Equal(1))
 				Expect(reconcile.Result{}).To(Equal(result))
 			})
-			It("fails when no any strategy exists in namespace", func() {
-
-				// Fake some client LIST calls and ensure we populate all
-				// different resources we could get during reconciliation
-				client.ListCalls(func(context context.Context, object runtime.Object, _ ...crc.ListOption) error {
-					switch object := object.(type) {
-					case *build.ClusterBuildStrategyList:
-						list := ctl.FakeNoClusterBuildStrategyList()
-						list.DeepCopyInto(object)
-					case *build.BuildStrategyList:
-						list := ctl.FakeNoBuildStrategyList()
-						list.DeepCopyInto(object)
-					}
-					return nil
-				})
-
-				statusCall := ctl.StubFunc(corev1.ConditionFalse, fmt.Sprintf("none BuildStrategies found in namespace %s", namespace))
-				statusWriter.UpdateCalls(statusCall)
-
-				_, err := reconciler.Reconcile(request)
-				Expect(err).To(HaveOccurred())
-				Expect(statusWriter.UpdateCallCount()).To(Equal(1))
-				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("none BuildStrategies found in namespace %s", namespace)))
-			})
 		})
+
 		Context("when spec strategy kind is not specified", func() {
 			JustBeforeEach(func() {
 				buildStrategyName = "kaniko"
@@ -478,13 +453,12 @@ var _ = Describe("Reconcile Build", func() {
 					return nil
 				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionFalse, fmt.Sprintf("buildStrategy %s does not exist in namespace %s", buildStrategyName, namespace))
+				statusCall := ctl.StubFunc(corev1.ConditionFalse, build.BuildStrategyNotFound, fmt.Sprintf("buildStrategy %s does not exist in namespace %s", buildStrategyName, namespace))
 				statusWriter.UpdateCalls(statusCall)
 
 				_, err := reconciler.Reconcile(request)
-				Expect(err).To(HaveOccurred())
+				Expect(err).To(BeNil())
 				Expect(statusWriter.UpdateCallCount()).To(Equal(1))
-				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("buildStrategy %s does not exist in namespace %s", buildStrategyName, namespace)))
 
 			})
 			It("default to BuildStrategy and succeed if the strategy exists", func() {
@@ -502,7 +476,7 @@ var _ = Describe("Reconcile Build", func() {
 					return nil
 				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionTrue, "Succeeded")
+				statusCall := ctl.StubFunc(corev1.ConditionTrue, build.SucceedStatus, "all validations succeeded")
 				statusWriter.UpdateCalls(statusCall)
 
 				result, err := reconciler.Reconcile(request)
@@ -531,7 +505,7 @@ var _ = Describe("Reconcile Build", func() {
 					return nil
 				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionFalse, "invalid source url")
+				statusCall := ctl.StubFunc(corev1.ConditionFalse, build.RemoteRepositoryUnreachable, "invalid source url")
 				statusWriter.UpdateCalls(statusCall)
 
 				_, err := reconciler.Reconcile(request)
@@ -557,7 +531,7 @@ var _ = Describe("Reconcile Build", func() {
 					return nil
 				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionFalse, "remote repository unreachable")
+				statusCall := ctl.StubFunc(corev1.ConditionFalse, build.RemoteRepositoryUnreachable, "remote repository unreachable")
 				statusWriter.UpdateCalls(statusCall)
 
 				_, err := reconciler.Reconcile(request)
@@ -583,7 +557,7 @@ var _ = Describe("Reconcile Build", func() {
 					return nil
 				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionTrue, "Succeeded")
+				statusCall := ctl.StubFunc(corev1.ConditionTrue, build.SucceedStatus, build.AllValidationsSucceeded)
 				statusWriter.UpdateCalls(statusCall)
 
 				result, err := reconciler.Reconcile(request)
@@ -602,9 +576,6 @@ var _ = Describe("Reconcile Build", func() {
 				// different resources we could get during reconciliation
 				client.ListCalls(func(context context.Context, object runtime.Object, _ ...crc.ListOption) error {
 					switch object := object.(type) {
-					case *corev1.SecretList:
-						list := ctl.SecretList(registrySecret)
-						list.DeepCopyInto(object)
 					case *build.ClusterBuildStrategyList:
 						list := ctl.ClusterBuildStrategyList(buildStrategyName)
 						list.DeepCopyInto(object)
@@ -612,7 +583,20 @@ var _ = Describe("Reconcile Build", func() {
 					return nil
 				})
 
-				statusCall := ctl.StubFunc(corev1.ConditionTrue, "Succeeded")
+				// Fake some client Get calls and ensure we populate all
+				// different resources we could get during reconciliation
+				client.GetCalls(func(context context.Context, nn types.NamespacedName, object runtime.Object) error {
+					switch object := object.(type) {
+					case *build.Build:
+						buildSample.DeepCopyInto(object)
+					case *corev1.Secret:
+						secretSample = ctl.SecretWithoutAnnotation(registrySecret, namespace)
+						secretSample.DeepCopyInto(object)
+					}
+					return nil
+				})
+
+				statusCall := ctl.StubFunc(corev1.ConditionTrue, build.SucceedStatus, build.AllValidationsSucceeded)
 				statusWriter.UpdateCalls(statusCall)
 
 				result, err := reconciler.Reconcile(request)
