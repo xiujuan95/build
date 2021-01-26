@@ -165,104 +165,11 @@ func (c *Catalog) BuildWithNilBuildStrategyKind(name string, ns string, strategy
 	}
 }
 
-// ClusterBuildStrategyList to support tests
-func (c *Catalog) ClusterBuildStrategyList(name string) *build.ClusterBuildStrategyList {
-	return &build.ClusterBuildStrategyList{
-		Items: []build.ClusterBuildStrategy{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: "build-examples",
-				},
-			},
-		},
-	}
-}
-
-// FakeClusterBuildStrategyList to support tests
-func (c *Catalog) FakeClusterBuildStrategyList() *build.ClusterBuildStrategyList {
-	return &build.ClusterBuildStrategyList{
-		Items: []build.ClusterBuildStrategy{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foobar",
-					Namespace: "build-examples",
-				},
-			},
-		},
-	}
-}
-
-// FakeNoClusterBuildStrategyList to support tests
-func (c *Catalog) FakeNoClusterBuildStrategyList() *build.ClusterBuildStrategyList {
-	return &build.ClusterBuildStrategyList{
-		Items: []build.ClusterBuildStrategy{},
-	}
-}
-
-// BuildStrategyList to support tests
-func (c *Catalog) BuildStrategyList(name string, ns string) *build.BuildStrategyList {
-	return &build.BuildStrategyList{
-		Items: []build.BuildStrategy{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: ns,
-				},
-			},
-		},
-	}
-}
-
-// FakeBuildStrategyList to support tests
-func (c *Catalog) FakeBuildStrategyList() *build.BuildStrategyList {
-	return &build.BuildStrategyList{
-		Items: []build.BuildStrategy{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foobar",
-				},
-			},
-		},
-	}
-}
-
-// FakeNoBuildStrategyList to support tests
-func (c *Catalog) FakeNoBuildStrategyList() *build.BuildStrategyList {
-	return &build.BuildStrategyList{
-		Items: []build.BuildStrategy{},
-	}
-}
-
-// FakeSecretList to support tests
-func (c *Catalog) FakeSecretList() corev1.SecretList {
-	return corev1.SecretList{
-		Items: []corev1.Secret{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foobar",
-				},
-			},
-		},
-	}
-}
-
-// FakeNoSecretListInNamespace returns an empty secret list
-func (c *Catalog) FakeNoSecretListInNamespace() corev1.SecretList {
-	return corev1.SecretList{
-		Items: []corev1.Secret{},
-	}
-}
-
-// SecretList to support tests
-func (c *Catalog) SecretList(name string) corev1.SecretList {
-	return corev1.SecretList{
-		Items: []corev1.Secret{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: name,
-				},
-			},
+// ClusterBuildStrategy to support tests
+func (c *Catalog) ClusterBuildStrategy(name string) *build.ClusterBuildStrategy {
+	return &build.ClusterBuildStrategy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:                       name,
 		},
 	}
 }
