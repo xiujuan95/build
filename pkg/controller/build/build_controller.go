@@ -322,11 +322,11 @@ func (r *ReconcileBuild) validateStrategyRef(ctx context.Context, b *build.Build
 	if b.Spec.StrategyRef.Kind != nil {
 		switch *b.Spec.StrategyRef.Kind {
 		case build.NamespacedBuildStrategyKind:
-			if err := r.validateBuildStrategy(ctx, b); err != nil {
+			if err := r.validateBuildStrategy(ctx, b.Spec.StrategyRef.Name, b); err != nil {
 				return err
 			}
 		case build.ClusterBuildStrategyKind:
-			if err := r.validateClusterBuildStrategy(ctx, b); err != nil {
+			if err := r.validateClusterBuildStrategy(ctx, b.Spec.StrategyRef.Name, b); err != nil {
 				return err
 			}
 		default:
@@ -334,7 +334,7 @@ func (r *ReconcileBuild) validateStrategyRef(ctx context.Context, b *build.Build
 		}
 	} else {
 		ctxlog.Info(ctx, "buildStrategy kind is nil, use default NamespacedBuildStrategyKind")
-		if err := r.validateBuildStrategy(ctx, b); err != nil {
+		if err := r.validateBuildStrategy(ctx, b.Spec.StrategyRef.Name, b); err != nil {
 			return err
 		}
 	}
@@ -342,39 +342,26 @@ func (r *ReconcileBuild) validateStrategyRef(ctx context.Context, b *build.Build
 	return nil
 }
 
-func (r *ReconcileBuild) validateBuildStrategy(ctx context.Context, b *build.Build) error {
-	list := &build.BuildStrategyList{}
+func (r *ReconcileBuild) validateBuildStrategy(ctx context.Context, strategyName string, b *build.Build) error {
+	buildStrategy := &build.BuildStrategy{}
 
-	if err := r.client.List(ctx, list, &client.ListOptions{Namespace: b.Namespace}); err != nil {
+	if err := r.client.Get(ctx, types.NamespacedName{Name: strategyName, Namespace: b.Namespace}, buildStrategy); err != nil && !apierrors.IsNotFound(err) {
 		return err
+	} else if apierrors.IsNotFound(err) {
+		MarkBuildStatus(b, build.BuildStrategyNotFound, fmt.Sprintf("buildStrategy %s does not exist in namespace %s", b.Spec.StrategyRef.Name, b.Namespace))
 	}
-
-	for _, s := range list.Items {
-		if s.Name == b.Spec.StrategyRef.Name {
-			return nil
-		}
-	}
-
-	MarkBuildStatus(b, build.BuildStrategyNotFound, fmt.Sprintf("buildStrategy %s does not exist in namespace %s", b.Spec.StrategyRef.Name, b.Namespace))
 
 	return nil
 }
 
-func (r *ReconcileBuild) validateClusterBuildStrategy(ctx context.Context, b *build.Build) error {
-	list := &build.ClusterBuildStrategyList{}
+func (r *ReconcileBuild) validateClusterBuildStrategy(ctx context.Context, strategyName string, b *build.Build) error {
+	clusterBuildStrategy := &build.ClusterBuildStrategy{}
 
-	if err := r.client.List(ctx, list); err != nil {
+	if err := r.client.Get(ctx, types.NamespacedName{Name: strategyName}, clusterBuildStrategy); err != nil && !apierrors.IsNotFound(err) {
 		return err
+	} else if apierrors.IsNotFound(err) {
+		MarkBuildStatus(b, build.ClusterBuildStrategyNotFound, fmt.Sprintf("clusterBuildStrategy %s does not exist", b.Spec.StrategyRef.Name))
 	}
-
-	for _, s := range list.Items {
-		if s.Name == b.Spec.StrategyRef.Name {
-			return nil
-		}
-	}
-
-	MarkBuildStatus(b, build.ClusterBuildStrategyNotFound, fmt.Sprintf("clusterBuildStrategy %s does not exist", b.Spec.StrategyRef.Name))
-
 	return nil
 }
 
